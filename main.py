@@ -16,8 +16,8 @@ BLANCO=(255, 255, 255)
 MARGEN=5 #ancho del borde entre celdas
 MARGEN_INFERIOR=60 #altura del margen inferior entre la cuadrícula y la ventana
 TAM=60  #tamaño de la celda
-FILS=5# número de filas del crucigrama 5
-COLS=6 # número de columnas del crucigrama 6
+FILS=3# número de filas del crucigrama 5
+COLS=3# número de columnas del crucigrama 6
 
 LLENA='*' 
 VACIA='-'
@@ -153,67 +153,80 @@ def creaVariables(tablero, limite, listaRestricciones, almacen):
 #########################################################################
 def restricciones(limite, variables, listaRestricciones):
     pivote = []
-    for i in range(0,limite):
-        horizontal = variables[i]
-        for j in range(limite,len(variables)):
-            vertical = variables[j]
-            
-            if vertical.ini_h <= horizontal.ini_h and vertical.ini_h +vertical.tamano-1 >= horizontal.ini_h and horizontal.ini_w <= vertical.ini_w and horizontal.ini_w+horizontal.tamano-1 >= vertical.ini_w:
-                restriccion = []
-                restriccion.append(vertical.ini_w)
-                restriccion.append(horizontal.ini_h)
-                restriccion.append(horizontal)
-                restriccion.append(vertical)
-                listaRestricciones.append(restriccion)
-                restriccion = []
-                restriccion.append(vertical.ini_w)
-                restriccion.append(horizontal.ini_h)
-                restriccion.append(vertical)
-                restriccion.append(horizontal)
-                pivote.append(restriccion)
+    for variable in variables:
+        for variable2 in variables:
+            if(variable.dir == 0 and variable2.dir == 1):
+                if variable2.ini_h <= variable.ini_h and variable2.ini_h +variable2.tamano-1 >= variable.ini_h and variable.ini_w <= variable2.ini_w and variable.ini_w+variable.tamano-1 >= variable2.ini_w:
+                    restriccion = []
+                    restriccion.append(int(variable2.ini_w))
+                    restriccion.append(int(variable.ini_h))
+                    restriccion.append(variable)
+                    restriccion.append(variable2)
+                    listaRestricciones.append(restriccion)
+                    restriccion = []
+                    restriccion.append(int(variable2.ini_w))
+                    restriccion.append(int(variable.ini_h))
+                    restriccion.append(variable2)
+                    restriccion.append(variable)
+                    pivote.append(restriccion)
     listaRestricciones = listaRestricciones+pivote
+    
+    #for restriccion in listaRestricciones:
+     #   print(restriccion)
 #########################################################################  
 # FORWARD CHECKING
 #########################################################################
 
-def FC(i, variables, listaRestricciones):
-    if i == len(variables):
-        return True
-    
-    for palabra in variables[i].dominio:
-        variables[i].setPalabra(palabra)
-        if forward(i, variables, listaRestricciones):
-            if FC(i + 1, variables, listaRestricciones):
+def FC(i , variables, listaRestricciones):
+    variable = variables[i]
+    for palabra in variable.dominio:
+        variable.palabra = palabra
+        if i == len(variables):
+            return True
+        elif forward(variable, variables, listaRestricciones):
+            if FC(i+1, variables, listaRestricciones):
                 return True
         restaura(i, variables, listaRestricciones)
+    return False                
+            
+
+def forward(variable, variables, listaRestricciones):
+    for variable2 in variables:
+        for restriccion in listaRestricciones:
+            if restriccion[2] == variable and restriccion[3] == variable2:
+                vacio = True
+                copiaDominio = variable2.dominio.copy()
+                for palabra2 in variable2.dominio:
+                    if variable.dir == 0:
+                        print(restriccion)
+                        letraH = restriccion[0] - variable.ini_w
+                        letraV = restriccion[1] - variable2.ini_h
+                        print(letraH,letraV)
+                    else:
+                        letraH = restriccion[0] - variable.ini_h
+                        letraV = restriccion[1] - variable2.ini_w
+                    if variable.palabra[letraH] == palabra2[letraV]:
+                        vacio = False
+                    else:
+                        copiaDominio.remove(palabra2)
+                        variable2.podados.append((variable, palabra2))
+                variable2.dominio = copiaDominio
+                if vacio:
+                    return False
+        
+    return True
+  
+
+
+def restaura(variable, variables, listaRestricciones):
+    for variable2 in variables:
+        for podado in variable2.podados:
+            if podado[0] == variable:
+                variable2.dominio.append(podado[1])
+        variable2.podados = []
+
     
-    variables[i].setPalabra(None)
-    return False
-
-def forward(i, variables, listaRestricciones):
-    for j in range(i + 1, len(variables)):
-        vacio = True
-        for palabra1 in variables[i].dominio[:]:
-            comprobar_palabra = False
-            for palabra2 in variables[j].dominio[:]:
-                if palabra1[variables[i].ini_w] == palabra2[variables[j].ini_h]:
-                    comprobar_palabra = True
-                    break
-            if not comprobar_palabra:
-                variables[i].dominio.remove(palabra1)
-                vacio = False
-        if not variables[i].dominio:
-            return False
-    return True
-
-def restaura(i, variables, listaRestricciones):
-    for j in range(i + 1, len(variables)):
-        for palabra in variables[j].dominio[:]:
-            if (i, j, variables[i], palabra) not in listaRestricciones:
-                variables[j].dominio.remove(palabra)
-        if not variables[j].dominio:
-            return False
-    return True
+    
 
 
 #########################################################################  
@@ -240,6 +253,30 @@ def AC3(variables, restricciones):
 
 def Revise(actual):
     comprobar = False
+    copiaDominio = actual[2].dominio.copy()
+    for palabra1 in copiaDominio:
+        
+        comprobar_palabra = False
+        for palabra2 in actual[3].dominio:
+            if actual[2].dir == 0:
+                letraH = actual[0] - actual[2].ini_w
+                letraV = actual[1] - actual[3].ini_h
+                print(palabra1, palabra2)
+                print(letraH,letraV)
+            else:
+                letraH = restriccion[0] - actual[2].ini_h
+                letraV = restriccion[1] - actual[3].ini_w
+            if palabra1[letraH] == palabra2[letraV]:
+                comprobar_palabra = True
+                break
+        if comprobar_palabra == False:
+            if palabra1 in actual[2].dominio:
+                actual[2].dominio.remove(palabra1)
+                comprobar = True
+    return comprobar
+            
+    '''
+    comprobar = False
     for palabra1 in actual[2].dominio[:]:
         comprobar_palabra = False
         for palabra2 in actual[3].dominio:
@@ -250,6 +287,7 @@ def Revise(actual):
             actual[2].dominio.remove(palabra1)
             comprobar = True
     return comprobar
+    '''
 #########################################################################  
 # Principal
 #########################################################################
@@ -305,12 +343,14 @@ def main():
                         MessageBox.showwarning("Alerta", "No hay solución")                                  
                 elif pulsaBotonAC3(pos, anchoVentana, altoVentana):                    
                     print("AC3")
-                    variables= creaVariables(tablero, limite, listaRestricciones, almacen)
+                    variables, limite= creaVariables(tablero, limite, listaRestricciones, almacen)
                     print("dominios antes del AC3")
                     for variable in variables:
                         print(variable)
                     res = AC3(variables, listaRestricciones)
                     print("dominios despues del AC3")
+                    for variable in variables:
+                        print(variable)
                 elif pulsaBotonReset(pos, anchoVentana, altoVentana):                   
                     tablero.reset()
                 elif inTablero(pos):
