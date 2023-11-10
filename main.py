@@ -16,8 +16,8 @@ BLANCO=(255, 255, 255)
 MARGEN=5 #ancho del borde entre celdas
 MARGEN_INFERIOR=60 #altura del margen inferior entre la cuadrícula y la ventana
 TAM=60  #tamaño de la celda
-FILS=3 # número de filas del crucigrama 5
-COLS=3 # número de columnas del crucigrama 6
+FILS=5# número de filas del crucigrama 5
+COLS=6 # número de columnas del crucigrama 6
 
 LLENA='*' 
 VACIA='-'
@@ -146,7 +146,7 @@ def creaVariables(tablero, limite, listaRestricciones, almacen):
                 inicios[j]=i+1
     variables = variables + sublista
     restricciones(limite, variables, listaRestricciones)
-    return variables
+    return variables, limite
                 
 #########################################################################  
 # RESTRICCIONES
@@ -175,50 +175,46 @@ def restricciones(limite, variables, listaRestricciones):
 #########################################################################  
 # FORWARD CHECKING
 #########################################################################
-def FC(variables, almacen, restricciones):
-    cola = queue.Queue()
-    for variable in variables:
-        cola.put(variable)
 
-    while not cola.empty():
-        var_actual = cola.get()
+def FC(i, variables, listaRestricciones):
+    if i == len(variables):
+        return True
+    
+    for palabra in variables[i].dominio:
+        variables[i].setPalabra(palabra)
+        if forward(i, variables, listaRestricciones):
+            if FC(i + 1, variables, listaRestricciones):
+                return True
+        restaura(i, variables, listaRestricciones)
+    
+    variables[i].setPalabra(None)
+    return False
 
-        if var_actual.getPalabra() is None:
-            for palabra in var_actual.dominio[:]:
-                var_actual.setPalabra(palabra)
-                consistente = True
-
-                # Verificar restricciones con variables futuras
-                for restriccion in restricciones:
-                    if restriccion[2] == var_actual:
-                        otra_variable = restriccion[3]
-                        if otra_variable.getPalabra() is None:
-                            palabras_restantes = list(otra_variable.dominio)
-                            palabras_restantes.remove(var_actual.getPalabra())
-
-                            if not palabras_restantes:
-                                consistente = False
-                                break
-                        elif otra_variable.getPalabra()[restriccion[0]] != var_actual.getPalabra()[restriccion[1]]:
-                            consistente = False
-                            break
-
-                if consistente:
-                    # Si la asignación es consistente, seguir con las siguientes variables
-                    if not FC(variables, almacen, restricciones):
-                        # Si no hay solución para las siguientes variables, deshacer la asignación actual
-                        var_actual.setPalabra(None)
-                    else:
-                        return True
-                else:
-                    # Deshacer la asignación si no es consistente
-                    var_actual.setPalabra(None)
-
-            # Si no hay asignaciones consistentes, retroceder
+def forward(i, variables, listaRestricciones):
+    for j in range(i + 1, len(variables)):
+        vacio = True
+        for palabra1 in variables[i].dominio[:]:
+            comprobar_palabra = False
+            for palabra2 in variables[j].dominio[:]:
+                if palabra1[variables[i].ini_w] == palabra2[variables[j].ini_h]:
+                    comprobar_palabra = True
+                    break
+            if not comprobar_palabra:
+                variables[i].dominio.remove(palabra1)
+                vacio = False
+        if not variables[i].dominio:
             return False
-
-    # Si se han asignado todas las variables, la solución es válida
     return True
+
+def restaura(i, variables, listaRestricciones):
+    for j in range(i + 1, len(variables)):
+        for palabra in variables[j].dominio[:]:
+            if (i, j, variables[i], palabra) not in listaRestricciones:
+                variables[j].dominio.remove(palabra)
+        if not variables[j].dominio:
+            return False
+    return True
+
 
 #########################################################################  
 # AC3
@@ -285,7 +281,7 @@ def main():
     game_over=False
     tablero=Tablero(FILS, COLS)
     listaRestricciones = []
-    limite = -0
+    limite = 0
     while not game_over:
         for event in pygame.event.get():
             if event.type==pygame.QUIT:               
@@ -295,10 +291,16 @@ def main():
                 pos=pygame.mouse.get_pos()                
                 if pulsaBotonFC(pos, anchoVentana, altoVentana):
                     print("FC")
-                    variables= creaVariables(tablero, limite, listaRestricciones, almacen)
-                    res=FC(variables, almacen, listaRestricciones) #aquí llamar al forward checking
+                    variables, limite= creaVariables(tablero, limite, listaRestricciones, almacen)
+                    res=FC(0, variables, listaRestricciones) #aquí llamar al forward checking
                     for variable in variables:
                         print(variable)
+                    for i in range (limite):
+                        actual = variables[i]
+                        contador = 0
+                        for letra in actual.palabra:
+                            tablero.setCelda(i, contador, letra.upper())
+                            contador = contador+1
                     if res==False:
                         MessageBox.showwarning("Alerta", "No hay solución")                                  
                 elif pulsaBotonAC3(pos, anchoVentana, altoVentana):                    
@@ -309,10 +311,6 @@ def main():
                         print(variable)
                     res = AC3(variables, listaRestricciones)
                     print("dominios despues del AC3")
-                    for i in range(limite):
-                        variable_actual = variables[i]
-                        for(j in variable_actual.palabra
-                            tablero.setCelda(
                 elif pulsaBotonReset(pos, anchoVentana, altoVentana):                   
                     tablero.reset()
                 elif inTablero(pos):
